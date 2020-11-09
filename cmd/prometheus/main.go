@@ -17,6 +17,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/prometheus/tsdb/wal"
 	"io"
 	"math"
 	"net"
@@ -351,7 +352,9 @@ func main() {
 
 	var (
 		localStorage  = &readyStorage{}
-		remoteStorage = remote.NewStorage(log.With(logger, "component", "remote"), prometheus.DefaultRegisterer, localStorage.StartTime, cfg.localStoragePath, time.Duration(cfg.RemoteFlushDeadline))
+		storageLogger = log.With(logger, "component", "remote")
+		walWatcher    = wal.NewIWatcher(cfg.localStoragePath, prometheus.DefaultRegisterer, storageLogger)
+		remoteStorage = remote.NewStorage(storageLogger, prometheus.DefaultRegisterer, localStorage.StartTime, walWatcher, time.Duration(cfg.RemoteFlushDeadline))
 		fanoutStorage = storage.NewFanout(logger, localStorage, remoteStorage)
 	)
 

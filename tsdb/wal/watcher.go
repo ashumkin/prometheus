@@ -58,6 +58,13 @@ type WatcherMetrics struct {
 	currentSegment        *prometheus.GaugeVec
 }
 
+type IWatcher interface {
+	SetName(name string)
+	SetWriter(w WriteTo)
+	Start()
+	Stop()
+}
+
 // Watcher watches the TSDB WAL for a given WriteTo.
 type Watcher struct {
 	name           string
@@ -82,6 +89,14 @@ type Watcher struct {
 
 	// For testing, stop when we hit this segment.
 	MaxSegment int
+}
+
+func (w *Watcher) SetName(name string) {
+	w.name = name
+}
+
+func (w *Watcher) SetWriter(writer WriteTo) {
+	w.writer = writer
 }
 
 func NewWatcherMetrics(reg prometheus.Registerer) *WatcherMetrics {
@@ -134,18 +149,20 @@ func NewWatcherMetrics(reg prometheus.Registerer) *WatcherMetrics {
 	return m
 }
 
+func NewIWatcher(path string, reg prometheus.Registerer, logger log.Logger) IWatcher {
+	return NewWatcher(NewWatcherMetrics(reg), NewLiveReaderMetrics(reg), logger, path)
+}
+
 // NewWatcher creates a new WAL watcher for a given WriteTo.
-func NewWatcher(metrics *WatcherMetrics, readerMetrics *LiveReaderMetrics, logger log.Logger, name string, writer WriteTo, walDir string) *Watcher {
+func NewWatcher(metrics *WatcherMetrics, readerMetrics *LiveReaderMetrics, logger log.Logger, walDir string) *Watcher {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
 	return &Watcher{
 		logger:        logger,
-		writer:        writer,
 		metrics:       metrics,
 		readerMetrics: readerMetrics,
 		walDir:        path.Join(walDir, "wal"),
-		name:          name,
 		quit:          make(chan struct{}),
 		done:          make(chan struct{}),
 

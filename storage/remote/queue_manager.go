@@ -242,7 +242,7 @@ type QueueManager struct {
 	cfg            config.QueueConfig
 	externalLabels labels.Labels
 	relabelConfigs []*relabel.Config
-	watcher        *wal.Watcher
+	watcher        wal.IWatcher
 
 	clientMtx   sync.RWMutex
 	storeClient WriteClient
@@ -266,10 +266,8 @@ type QueueManager struct {
 // NewQueueManager builds a new QueueManager.
 func NewQueueManager(
 	metrics *queueManagerMetrics,
-	watcherMetrics *wal.WatcherMetrics,
-	readerMetrics *wal.LiveReaderMetrics,
+	watcher wal.IWatcher,
 	logger log.Logger,
-	walDir string,
 	samplesIn *ewmaRate,
 	cfg config.QueueConfig,
 	externalLabels labels.Labels,
@@ -304,9 +302,11 @@ func NewQueueManager(
 		samplesOutDuration: newEWMARate(ewmaWeight, shardUpdateDuration),
 
 		metrics: metrics,
+		watcher: watcher,
 	}
 
-	t.watcher = wal.NewWatcher(watcherMetrics, readerMetrics, logger, client.Name(), t, walDir)
+	t.watcher.SetWriter(t)
+	t.watcher.SetName(client.Name())
 	t.shards = t.newShards()
 
 	return t

@@ -51,29 +51,25 @@ type WriteStorage struct {
 	reg    prometheus.Registerer
 	mtx    sync.Mutex
 
-	watcherMetrics    *wal.WatcherMetrics
-	liveReaderMetrics *wal.LiveReaderMetrics
 	externalLabels    labels.Labels
-	walDir            string
 	queues            map[string]*QueueManager
 	samplesIn         *ewmaRate
 	flushDeadline     time.Duration
+	watcher           wal.IWatcher
 }
 
 // NewWriteStorage creates and runs a WriteStorage.
-func NewWriteStorage(logger log.Logger, reg prometheus.Registerer, walDir string, flushDeadline time.Duration) *WriteStorage {
+func NewWriteStorage(logger log.Logger, reg prometheus.Registerer, watcher wal.IWatcher, flushDeadline time.Duration) *WriteStorage {
 	if logger == nil {
 		logger = log.NewNopLogger()
 	}
 	rws := &WriteStorage{
 		queues:            make(map[string]*QueueManager),
-		watcherMetrics:    wal.NewWatcherMetrics(reg),
-		liveReaderMetrics: wal.NewLiveReaderMetrics(reg),
+		watcher: watcher,
 		logger:            logger,
 		reg:               reg,
 		flushDeadline:     flushDeadline,
 		samplesIn:         newEWMARate(ewmaWeight, shardUpdateDuration),
-		walDir:            walDir,
 	}
 	go rws.run()
 	return rws
@@ -140,10 +136,8 @@ func (rws *WriteStorage) ApplyConfig(conf *config.Config) error {
 		endpoint := rwConf.URL.String()
 		newQueues[hash] = NewQueueManager(
 			newQueueManagerMetrics(rws.reg, name, endpoint),
-			rws.watcherMetrics,
-			rws.liveReaderMetrics,
+			rws.watcher,
 			rws.logger,
-			rws.walDir,
 			rws.samplesIn,
 			rwConf.QueueConfig,
 			conf.GlobalConfig.ExternalLabels,

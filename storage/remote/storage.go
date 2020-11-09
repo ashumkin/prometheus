@@ -18,6 +18,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	"github.com/prometheus/prometheus/tsdb/wal"
 	"sync"
 	"time"
 
@@ -57,7 +58,7 @@ type Storage struct {
 }
 
 // NewStorage returns a remote.Storage.
-func NewStorage(l log.Logger, reg prometheus.Registerer, stCallback startTimeCallback, walDir string, flushDeadline time.Duration) *Storage {
+func NewStorage(l log.Logger, reg prometheus.Registerer, stCallback startTimeCallback, watcher wal.IWatcher, flushDeadline time.Duration) *Storage {
 	if l == nil {
 		l = log.NewNopLogger()
 	}
@@ -66,7 +67,7 @@ func NewStorage(l log.Logger, reg prometheus.Registerer, stCallback startTimeCal
 		logger:                 logging.Dedupe(l, 1*time.Minute),
 		localStartTimeCallback: stCallback,
 	}
-	s.rws = NewWriteStorage(s.logger, reg, walDir, flushDeadline)
+	s.rws = NewWriteStorage(s.logger, reg, watcher, flushDeadline)
 	return s
 }
 
